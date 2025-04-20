@@ -17,7 +17,7 @@ export default function Team() {
     {
       name: "Yashmay",
       role: "Technical Lead",
-      imgUrl: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=500&h=667"
+      imgUrl: "https://mlrdxjezzfez.i.optimole.com/w:225/h:300/q:mauto/ig:avif/http://trepidustech.com/wp-content/uploads/2024/09/924ef857-2421-4570-a399-7e734f456f61-e1726234356249.jpg"
     }
   ];
 
@@ -37,18 +37,10 @@ export default function Team() {
                     <img
                       src={member.imgUrl}
                       alt={`${member.name} - ${member.role}`}
-                      className={`w-full h-full object-cover ${
-                        member.name === "Sameet" 
-                          ? "object-top scale-110 grayscale-[30%]" 
-                          : member.name === "Dharnesh" 
-                            ? "object-top scale-110 grayscale-[30%]" 
-                            : ""
-                      }`}
+                      className={`w-full h-full object-cover object-top scale-110 grayscale-[30%]`}
                       loading="lazy"
                       style={{
-                        filter: member.name === "Sameet" || member.name === "Dharnesh" 
-                          ? "contrast(1.1) brightness(1.05)" 
-                          : "none"
+                        filter: "contrast(1.1) brightness(1.05)"
                       }}
                     />
                   </div>
