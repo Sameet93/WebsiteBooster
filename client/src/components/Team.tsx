@@ -7,7 +7,7 @@ export default function Team() {
     {
       name: "Sameet",
       role: "Co-founder & CTO",
-      imgUrl: "https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=500&h=667"
+      imgUrl: "https://mlrdxjezzfez.i.optimole.com/w:201/h:268/q:mauto/ig:avif/http://trepidustech.com/wp-content/uploads/2024/11/IMG_2631-scaled.jpeg"
     },
     {
       name: "Dharnesh",
@@ -32,13 +32,18 @@ export default function Team() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {teamMembers.map((member, index) => (
               <Card key={index} className="bg-secondary overflow-hidden hover:shadow-lg transition-shadow">
-                <AspectRatio ratio={3/4} className="bg-muted">
-                  <img
-                    src={member.imgUrl}
-                    alt={`${member.name} - ${member.role}`}
-                    className="object-cover w-full h-full"
-                    loading="lazy"
-                  />
+                <AspectRatio ratio={1} className="bg-muted">
+                  <div className="w-full h-full flex items-center justify-center overflow-hidden">
+                    <img
+                      src={member.imgUrl}
+                      alt={`${member.name} - ${member.role}`}
+                      className={`w-full h-full object-cover ${member.name === "Sameet" ? "object-top scale-110 grayscale-[30%]" : ""}`}
+                      loading="lazy"
+                      style={{
+                        filter: member.name === "Sameet" ? "contrast(1.1) brightness(1.05)" : "none"
+                      }}
+                    />
+                  </div>
                 </AspectRatio>
                 <div className="p-5">
                   <h3 className="text-xl font-semibold">{member.name}</h3>
