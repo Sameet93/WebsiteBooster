@@ -12,7 +12,7 @@ export default function Team() {
     {
       name: "Dharnesh",
       role: "Co-founder",
-      imgUrl: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=500&h=667"
+      imgUrl: "https://mlrdxjezzfez.i.optimole.com/w:227/h:300/q:mauto/ig:avif/http://trepidustech.com/wp-content/uploads/2024/09/8b892caf-c2f2-4883-9b11-a33103a781ee.jpg"
     },
     {
       name: "Yashmay",
@@ -37,10 +37,18 @@ export default function Team() {
                     <img
                       src={member.imgUrl}
                       alt={`${member.name} - ${member.role}`}
-                      className={`w-full h-full object-cover ${member.name === "Sameet" ? "object-top scale-110 grayscale-[30%]" : ""}`}
+                      className={`w-full h-full object-cover ${
+                        member.name === "Sameet" 
+                          ? "object-top scale-110 grayscale-[30%]" 
+                          : member.name === "Dharnesh" 
+                            ? "object-top scale-110 grayscale-[30%]" 
+                            : ""
+                      }`}
                       loading="lazy"
                       style={{
-                        filter: member.name === "Sameet" ? "contrast(1.1) brightness(1.05)" : "none"
+                        filter: member.name === "Sameet" || member.name === "Dharnesh" 
+                          ? "contrast(1.1) brightness(1.05)" 
+                          : "none"
                       }}
                     />
                   </div>
