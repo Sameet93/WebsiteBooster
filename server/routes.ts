@@ -2,11 +2,12 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
+import { sendContactEmail } from "./services/email";
 
 const contactSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
-  subject: z.string().optional(),
+  subject: z.string().optional().default("Website Contact Form"),
   message: z.string().min(10),
 });
 
@@ -16,13 +17,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = contactSchema.parse(req.body);
       
-      // Here you would typically send an email or store the contact request
-      // For now, we'll just return a success response
+      // Send email using SendGrid
+      const emailSent = await sendContactEmail(validatedData);
       
-      res.status(200).json({ 
-        success: true, 
-        message: "Contact form submitted successfully" 
-      });
+      if (emailSent) {
+        res.status(200).json({ 
+          success: true, 
+          message: "Contact form submitted successfully" 
+        });
+      } else {
+        // Email failed to send but data was valid
+        res.status(500).json({ 
+          success: false, 
+          message: "Failed to send email, please try again later" 
+        });
+      }
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ 

@@ -3,6 +3,15 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
+
+// Check for important environment variables
+if (process.env.NODE_ENV === "development") {
+  if (!process.env.SENDGRID_API_KEY) {
+    log("Warning: SENDGRID_API_KEY environment variable not set. Contact form will not send emails.", "server");
+  } else {
+    log("SendGrid API Key found, email service ready", "server");
+  }
+}
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
