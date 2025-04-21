@@ -19,6 +19,7 @@ This is the official website for Trepidus Tech, featuring their IT consulting se
 - Docker for containerization
 - Tailwind CSS for styling
 - React Query for data fetching
+- GitHub Actions for CI/CD
 
 ## Development
 
@@ -44,9 +45,41 @@ This is the official website for Trepidus Tech, featuring their IT consulting se
    npm run dev
    ```
 
-## Deployment to AWS
+## Deployment
 
-### Using Docker
+### CI/CD with GitHub Actions
+
+This project includes several GitHub Actions workflows for automated testing and deployment:
+
+1. **Test Workflow** (`.github/workflows/test.yml`)
+   - Runs on all pull requests and branch pushes (except main)
+   - Performs linting, type checking, and API tests
+   - Builds and tests Docker image
+
+2. **AWS Deployment Workflow** (`.github/workflows/aws-deploy.yml`)
+   - Runs on pushes to main branch and manual triggers
+   - Performs testing, builds Docker image
+   - Deploys to AWS ECS
+   - Performs post-deployment verification
+
+3. **AWS Infrastructure Setup** (`.github/workflows/aws-setup.yml`)
+   - Sets up required AWS infrastructure (one-time setup)
+   - Creates ECR repository, ECS cluster, and load balancer
+   - Can be triggered manually with custom parameters
+
+4. **Environment Creation** (`.github/workflows/create-environment.yml`)
+   - Creates additional environments (staging, dev, etc.)
+   - Sets up necessary AWS resources
+   - Generates deployment workflow for the environment
+
+### Required GitHub Secrets
+
+To use the CI/CD workflows, add these secrets to your GitHub repository:
+
+- `AWS_ACCESS_KEY_ID`: Your AWS access key
+- `AWS_SECRET_ACCESS_KEY`: Your AWS secret key
+
+### Manual Deployment with Docker
 
 1. Build the Docker image:
    ```
@@ -73,55 +106,42 @@ This is the official website for Trepidus Tech, featuring their IT consulting se
    docker push <your-account-id>.dkr.ecr.<your-region>.amazonaws.com/trepidus-tech-website:latest
    ```
 
-4. Deploy on AWS using one of these services:
-   - **Amazon ECS (Elastic Container Service)**: For container orchestration
-   - **AWS App Runner**: For a simpler deployment process
-   - **Amazon EKS (Elastic Kubernetes Service)**: For Kubernetes-based deployment
-   - **AWS Fargate**: For serverless container deployment
+### Using the Deployment Script
 
-### Example ECS Deployment
+A helper script is included to simplify deployment:
 
-1. Create an ECS cluster
-2. Create a task definition using your ECR image
-3. Configure environment variables in the task definition:
-   ```
-   SENDGRID_API_KEY=your_sendgrid_api_key
-   NODE_ENV=production
-   ```
-4. Create a service in your cluster using the task definition
-5. Set up load balancing and auto-scaling as needed
+```
+./deploy-to-aws.sh <aws-region> <aws-account-id>
+```
 
-### Using AWS Elastic Beanstalk (Alternative)
+This script handles building, tagging, and pushing the Docker image, and updating the ECS task definition.
 
-1. Install the AWS EB CLI:
-   ```
-   pip install awsebcli
-   ```
+### Advanced Deployment Options
 
-2. Initialize Elastic Beanstalk in your project:
-   ```
-   eb init
-   ```
-
-3. Create an environment:
-   ```
-   eb create
-   ```
-
-4. Set environment variables:
-   ```
-   eb setenv SENDGRID_API_KEY=your_sendgrid_api_key NODE_ENV=production
-   ```
-
-5. Deploy the application:
-   ```
-   eb deploy
-   ```
+For more advanced deployment options and detailed instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
 
 ## Environment Variables
 
 - `NODE_ENV`: Set to "production" for production environment
 - `SENDGRID_API_KEY`: Your SendGrid API key for email functionality
+
+## Testing
+
+Run API tests using the included test script:
+
+```
+./tests/api.sh
+```
+
+This tests the health endpoint and contact form API.
+
+## Multi-Environment Setup
+
+The project supports multiple environments (development, staging, production):
+
+1. Use the `create-environment.yml` workflow to create new environments
+2. Each environment gets its own ECS service and ECR repository
+3. Branch-based deployments can be set up for each environment
 
 ## Contact
 

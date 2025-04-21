@@ -1,0 +1,241 @@
+name: Create Custom Environment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment_name:
+        description: 'Environment name (e.g., staging, dev, qa)'
+        required: true
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        default: 'us-east-1'
+      cluster_name:
+        description: 'ECS Cluster Name'
+        required: true
+        default: 'production'
+      create_resources:
+        description: 'Create new AWS resources or use existing'
+        type: boolean
+        required: true
+        default: true
+
+env:
+  BASE_ECR_REPOSITORY: trepidus-tech-website
+
+jobs:
+  create-environment:
+    name: Create Custom Environment
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ github.event.inputs.aws_region }}
+
+    - name: Set environment variables
+      run: |
+        echo "ECR_REPOSITORY=${{ env.BASE_ECR_REPOSITORY }}-${{ github.event.inputs.environment_name }}" >> $GITHUB_ENV
+        echo "SERVICE_NAME=${{ env.BASE_ECR_REPOSITORY }}-${{ github.event.inputs.environment_name }}" >> $GITHUB_ENV
+        
+    - name: Create ECR Repository
+      if: github.event.inputs.create_resources == 'true'
+      run: |
+        # Check if ECR repository exists
+        if ! aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --region ${{ github.event.inputs.aws_region }} 2>/dev/null; then
+          echo "Creating ECR repository ${{ env.ECR_REPOSITORY }}"
+          aws ecr create-repository \
+            --repository-name ${{ env.ECR_REPOSITORY }} \
+            --image-scanning-configuration scanOnPush=true \
+            --region ${{ github.event.inputs.aws_region }}
+        else
+          echo "ECR repository ${{ env.ECR_REPOSITORY }} already exists"
+        fi
+        
+    - name: Create SSM Parameter for SendGrid API Key
+      if: github.event.inputs.create_resources == 'true'
+      run: |
+        # Create a placeholder parameter - the actual key should be updated manually
+        PARAM_NAME="/trepidus-tech/${{ github.event.inputs.environment_name }}/SENDGRID_API_KEY"
+        if ! aws ssm get-parameter --name "$PARAM_NAME" --region ${{ github.event.inputs.aws_region }} 2>/dev/null; then
+          echo "Creating SSM Parameter $PARAM_NAME with placeholder value"
+          aws ssm put-parameter \
+            --name "$PARAM_NAME" \
+            --value "PLACEHOLDER-REPLACE-ME" \
+            --type SecureString \
+            --region ${{ github.event.inputs.aws_region }}
+          echo "IMPORTANT: Please update the parameter value manually in the AWS console with your actual SendGrid API key"
+        else
+          echo "SSM Parameter $PARAM_NAME already exists"
+        fi
+        
+    - name: Check Cluster and Create Service
+      run: |
+        # Check if ECS cluster exists
+        CLUSTER_EXISTS=$(aws ecs describe-clusters --clusters ${{ github.event.inputs.cluster_name }} --region ${{ github.event.inputs.aws_region }} --query 'clusters[0].status' --output text 2>/dev/null || echo "MISSING")
+        
+        if [ "$CLUSTER_EXISTS" == "MISSING" ]; then
+          echo "Creating ECS cluster ${{ github.event.inputs.cluster_name }}"
+          aws ecs create-cluster \
+            --cluster-name ${{ github.event.inputs.cluster_name }} \
+            --capacity-providers FARGATE FARGATE_SPOT \
+            --region ${{ github.event.inputs.aws_region }}
+        else
+          echo "ECS cluster ${{ github.event.inputs.cluster_name }} already exists"
+        fi
+        
+    - name: Create Task Definition
+      run: |
+        # Update task definition file with region, account ID, and environment
+        ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text)
+        cat aws-ecs-task-definition.json | \
+          sed "s/<your-account-id>/$ACCOUNT_ID/g" | \
+          sed "s/<your-region>/${{ github.event.inputs.aws_region }}/g" | \
+          sed "s/trepidus-tech-website/${{ env.SERVICE_NAME }}/g" | \
+          sed "s/SENDGRID_API_KEY/SENDGRID_API_KEY_${{ github.event.inputs.environment_name }}/g" > env-task-def.json
+        
+        # Add environment-specific variables
+        jq '.containerDefinitions[0].environment += [{"name": "ENVIRONMENT", "value": "${{ github.event.inputs.environment_name }}"}]' env-task-def.json > updated-task-def.json
+        
+        # Register task definition
+        aws ecs register-task-definition \
+          --cli-input-json file://updated-task-def.json \
+          --region ${{ github.event.inputs.aws_region }}
+          
+    - name: Create ECS Service
+      if: github.event.inputs.create_resources == 'true'
+      run: |
+        # Get subnets and create security group from default VPC
+        DEFAULT_VPC_ID=$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true --query 'Vpcs[0].VpcId' --output text --region ${{ github.event.inputs.aws_region }})
+        SUBNETS=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$DEFAULT_VPC_ID --query 'Subnets[0:2].SubnetId' --output text --region ${{ github.event.inputs.aws_region }})
+        SUBNET_IDS=($SUBNETS)
+        
+        # Create security group for the ECS tasks
+        SG_ID=$(aws ec2 create-security-group \
+          --group-name ${{ env.SERVICE_NAME }}-sg \
+          --description "Security group for ${{ env.SERVICE_NAME }}" \
+          --vpc-id $DEFAULT_VPC_ID \
+          --query 'GroupId' \
+          --output text \
+          --region ${{ github.event.inputs.aws_region }})
+          
+        # Allow inbound traffic on port 5000
+        aws ec2 authorize-security-group-ingress \
+          --group-id $SG_ID \
+          --protocol tcp \
+          --port 5000 \
+          --cidr 0.0.0.0/0 \
+          --region ${{ github.event.inputs.aws_region }}
+        
+        # Create the service
+        aws ecs create-service \
+          --cluster ${{ github.event.inputs.cluster_name }} \
+          --service-name ${{ env.SERVICE_NAME }} \
+          --task-definition ${{ env.SERVICE_NAME }} \
+          --desired-count 1 \
+          --launch-type FARGATE \
+          --network-configuration "awsvpcConfiguration={subnets=[${SUBNET_IDS[0]},${SUBNET_IDS[1]}],securityGroups=[$SG_ID],assignPublicIp=ENABLED}" \
+          --region ${{ github.event.inputs.aws_region }}
+          
+    - name: Create GitHub Environment
+      run: |
+        echo "::notice::Environment '${{ github.event.inputs.environment_name }}' has been created."
+        echo "::notice::Please create a corresponding environment in GitHub repository settings."
+        echo "::notice::Add the following secrets and variables to the environment:"
+        echo "::notice::- AWS_REGION: ${{ github.event.inputs.aws_region }}"
+        echo "::notice::- ECS_CLUSTER: ${{ github.event.inputs.cluster_name }}"
+        echo "::notice::- ECS_SERVICE: ${{ env.SERVICE_NAME }}"
+        echo "::notice::- ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}"
+        
+    - name: Create Workflow File for Environment
+      run: |
+        cat << EOF > environment-deploy.yml
+        name: Deploy to ${{ github.event.inputs.environment_name }}
+
+        on:
+          workflow_dispatch:
+          push:
+            branches:
+              - ${{ github.event.inputs.environment_name }} # Deploy when pushing to this branch
+
+        env:
+          AWS_REGION: ${{ github.event.inputs.aws_region }}
+          ECR_REPOSITORY: ${{ env.ECR_REPOSITORY }}
+          ECS_CLUSTER: ${{ github.event.inputs.cluster_name }}
+          ECS_SERVICE: ${{ env.SERVICE_NAME }}
+          CONTAINER_NAME: ${{ env.SERVICE_NAME }}
+          ENVIRONMENT: ${{ github.event.inputs.environment_name }}
+
+        jobs:
+          deploy:
+            name: Deploy to ${{ github.event.inputs.environment_name }}
+            runs-on: ubuntu-latest
+            environment: ${{ github.event.inputs.environment_name }}
+            
+            steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+              
+            - name: Configure AWS credentials
+              uses: aws-actions/configure-aws-credentials@v2
+              with:
+                aws-access-key-id: \${{ secrets.AWS_ACCESS_KEY_ID }}
+                aws-secret-access-key: \${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                aws-region: \${{ env.AWS_REGION }}
+                
+            - name: Login to Amazon ECR
+              id: login-ecr
+              uses: aws-actions/amazon-ecr-login@v1
+              
+            - name: Build, tag, and push image to Amazon ECR
+              id: build-image
+              uses: docker/build-push-action@v4
+              with:
+                context: .
+                push: true
+                tags: \${{ steps.login-ecr.outputs.registry }}/\${{ env.ECR_REPOSITORY }}:\${{ github.sha }}
+                build-args: |
+                  ENVIRONMENT=\${{ env.ENVIRONMENT }}
+                
+            - name: Fill in the new image ID in the Amazon ECS task definition
+              id: task-def
+              uses: aws-actions/amazon-ecs-render-task-definition@v1
+              with:
+                task-definition: updated-task-def.json
+                container-name: \${{ env.CONTAINER_NAME }}
+                image: \${{ steps.login-ecr.outputs.registry }}/\${{ env.ECR_REPOSITORY }}:\${{ github.sha }}
+                
+            - name: Deploy Amazon ECS task definition
+              uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+              with:
+                task-definition: \${{ steps.task-def.outputs.task-definition }}
+                service: \${{ env.ECS_SERVICE }}
+                cluster: \${{ env.ECS_CLUSTER }}
+                wait-for-service-stability: true
+        EOF
+        
+        echo "::notice::Created workflow file for ${{ github.event.inputs.environment_name }} environment"
+        echo "::notice::To use it, create a file at .github/workflows/${{ github.event.inputs.environment_name }}-deploy.yml"
+        echo "::notice::with the contents of the environment-deploy.yml file created in this workflow"
+        
+    - name: Print Summary
+      run: |
+        echo "Environment ${{ github.event.inputs.environment_name }} setup complete!"
+        echo ""
+        echo "Summary:"
+        echo "- ECR Repository: ${{ env.ECR_REPOSITORY }}"
+        echo "- ECS Cluster: ${{ github.event.inputs.cluster_name }}"
+        echo "- ECS Service: ${{ env.SERVICE_NAME }}"
+        echo ""
+        echo "Next steps:"
+        echo "1. Update the SendGrid API key in AWS Systems Manager Parameter Store"
+        echo "2. Create a branch named ${{ github.event.inputs.environment_name }} in your repository"
+        echo "3. Create a GitHub environment named ${{ github.event.inputs.environment_name }} with the required secrets and variables"
+        echo "4. Create the workflow file .github/workflows/${{ github.event.inputs.environment_name }}-deploy.yml"
+        echo "5. Push code to the ${{ github.event.inputs.environment_name }} branch to trigger deployment"

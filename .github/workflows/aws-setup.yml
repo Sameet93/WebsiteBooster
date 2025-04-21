@@ -1,0 +1,291 @@
+name: AWS Environment Setup
+
+on:
+  workflow_dispatch:
+    inputs:
+      aws_region:
+        description: 'AWS Region'
+        required: true
+        default: 'us-east-1'
+      cluster_name:
+        description: 'ECS Cluster Name'
+        required: true
+        default: 'production'
+      service_name:
+        description: 'ECS Service Name'
+        required: true
+        default: 'trepidus-tech-website'
+      create_load_balancer:
+        description: 'Create Load Balancer'
+        type: boolean
+        required: true
+        default: true
+
+env:
+  ECR_REPOSITORY: trepidus-tech-website
+
+jobs:
+  setup-aws-infrastructure:
+    name: Set up AWS Infrastructure
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ github.event.inputs.aws_region }}
+        
+    - name: Create ECR Repository
+      run: |
+        # Check if ECR repository exists
+        if ! aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --region ${{ github.event.inputs.aws_region }} 2>/dev/null; then
+          echo "Creating ECR repository ${{ env.ECR_REPOSITORY }}"
+          aws ecr create-repository \
+            --repository-name ${{ env.ECR_REPOSITORY }} \
+            --image-scanning-configuration scanOnPush=true \
+            --region ${{ github.event.inputs.aws_region }}
+        else
+          echo "ECR repository ${{ env.ECR_REPOSITORY }} already exists"
+        fi
+        
+    - name: Create SSM Parameter for SendGrid API Key
+      run: |
+        # Create a placeholder parameter - the actual key should be updated manually
+        PARAM_NAME="/trepidus-tech/SENDGRID_API_KEY"
+        if ! aws ssm get-parameter --name "$PARAM_NAME" --region ${{ github.event.inputs.aws_region }} 2>/dev/null; then
+          echo "Creating SSM Parameter $PARAM_NAME with placeholder value"
+          aws ssm put-parameter \
+            --name "$PARAM_NAME" \
+            --value "PLACEHOLDER-REPLACE-ME" \
+            --type SecureString \
+            --region ${{ github.event.inputs.aws_region }}
+          echo "IMPORTANT: Please update the parameter value manually in the AWS console with your actual SendGrid API key"
+        else
+          echo "SSM Parameter $PARAM_NAME already exists"
+        fi
+        
+    - name: Create ECS Cluster
+      run: |
+        # Check if ECS cluster exists
+        CLUSTER_EXISTS=$(aws ecs describe-clusters --clusters ${{ github.event.inputs.cluster_name }} --region ${{ github.event.inputs.aws_region }} --query 'clusters[0].status' --output text 2>/dev/null || echo "MISSING")
+        
+        if [ "$CLUSTER_EXISTS" == "MISSING" ]; then
+          echo "Creating ECS cluster ${{ github.event.inputs.cluster_name }}"
+          aws ecs create-cluster \
+            --cluster-name ${{ github.event.inputs.cluster_name }} \
+            --capacity-providers FARGATE FARGATE_SPOT \
+            --region ${{ github.event.inputs.aws_region }}
+        else
+          echo "ECS cluster ${{ github.event.inputs.cluster_name }} already exists"
+        fi
+        
+    - name: Create VPC and Subnets (if needed)
+      if: github.event.inputs.create_load_balancer == 'true'
+      run: |
+        # Check if we should use default VPC
+        DEFAULT_VPC_ID=$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true --query 'Vpcs[0].VpcId' --output text --region ${{ github.event.inputs.aws_region }})
+        
+        if [ -z "$DEFAULT_VPC_ID" ] || [ "$DEFAULT_VPC_ID" == "None" ]; then
+          echo "No default VPC found. Creating new VPC..."
+          # Create VPC
+          VPC_ID=$(aws ec2 create-vpc --cidr-block 10.0.0.0/16 --query 'Vpc.VpcId' --output text --region ${{ github.event.inputs.aws_region }})
+          aws ec2 create-tags --resources $VPC_ID --tags Key=Name,Value=TrepidusVPC --region ${{ github.event.inputs.aws_region }}
+          
+          # Create 2 public subnets in different AZs
+          SUBNET1_ID=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block 10.0.1.0/24 --availability-zone ${github.event.inputs.aws_region}a --query 'Subnet.SubnetId' --output text --region ${{ github.event.inputs.aws_region }})
+          SUBNET2_ID=$(aws ec2 create-subnet --vpc-id $VPC_ID --cidr-block 10.0.2.0/24 --availability-zone ${github.event.inputs.aws_region}b --query 'Subnet.SubnetId' --output text --region ${{ github.event.inputs.aws_region }})
+          
+          # Create and attach internet gateway
+          IGW_ID=$(aws ec2 create-internet-gateway --query 'InternetGateway.InternetGatewayId' --output text --region ${{ github.event.inputs.aws_region }})
+          aws ec2 attach-internet-gateway --vpc-id $VPC_ID --internet-gateway-id $IGW_ID --region ${{ github.event.inputs.aws_region }}
+          
+          # Create route table and add route to internet
+          ROUTE_TABLE_ID=$(aws ec2 create-route-table --vpc-id $VPC_ID --query 'RouteTable.RouteTableId' --output text --region ${{ github.event.inputs.aws_region }})
+          aws ec2 create-route --route-table-id $ROUTE_TABLE_ID --destination-cidr-block 0.0.0.0/0 --gateway-id $IGW_ID --region ${{ github.event.inputs.aws_region }}
+          
+          # Associate route table with subnets
+          aws ec2 associate-route-table --subnet-id $SUBNET1_ID --route-table-id $ROUTE_TABLE_ID --region ${{ github.event.inputs.aws_region }}
+          aws ec2 associate-route-table --subnet-id $SUBNET2_ID --route-table-id $ROUTE_TABLE_ID --region ${{ github.event.inputs.aws_region }}
+          
+          # Enable auto-assign public IP
+          aws ec2 modify-subnet-attribute --subnet-id $SUBNET1_ID --map-public-ip-on-launch --region ${{ github.event.inputs.aws_region }}
+          aws ec2 modify-subnet-attribute --subnet-id $SUBNET2_ID --map-public-ip-on-launch --region ${{ github.event.inputs.aws_region }}
+          
+          echo "VPC_ID=$VPC_ID" >> $GITHUB_ENV
+          echo "SUBNET1_ID=$SUBNET1_ID" >> $GITHUB_ENV
+          echo "SUBNET2_ID=$SUBNET2_ID" >> $GITHUB_ENV
+        else
+          echo "Using default VPC: $DEFAULT_VPC_ID"
+          SUBNETS=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$DEFAULT_VPC_ID --query 'Subnets[0:2].SubnetId' --output text --region ${{ github.event.inputs.aws_region }})
+          SUBNET_IDS=($SUBNETS)
+          
+          echo "VPC_ID=$DEFAULT_VPC_ID" >> $GITHUB_ENV
+          echo "SUBNET1_ID=${SUBNET_IDS[0]}" >> $GITHUB_ENV
+          echo "SUBNET2_ID=${SUBNET_IDS[1]}" >> $GITHUB_ENV
+        fi
+        
+    - name: Create Security Group
+      if: github.event.inputs.create_load_balancer == 'true'
+      run: |
+        # Create security group for load balancer
+        SG_ID=$(aws ec2 create-security-group \
+          --group-name TrepidusLBSecurityGroup \
+          --description "Security group for Trepidus Tech Website load balancer" \
+          --vpc-id ${{ env.VPC_ID }} \
+          --query 'GroupId' \
+          --output text \
+          --region ${{ github.event.inputs.aws_region }})
+          
+        # Allow HTTP and HTTPS traffic
+        aws ec2 authorize-security-group-ingress \
+          --group-id $SG_ID \
+          --protocol tcp \
+          --port 80 \
+          --cidr 0.0.0.0/0 \
+          --region ${{ github.event.inputs.aws_region }}
+          
+        aws ec2 authorize-security-group-ingress \
+          --group-id $SG_ID \
+          --protocol tcp \
+          --port 443 \
+          --cidr 0.0.0.0/0 \
+          --region ${{ github.event.inputs.aws_region }}
+          
+        echo "SECURITY_GROUP_ID=$SG_ID" >> $GITHUB_ENV
+        
+    - name: Create Load Balancer and Target Group
+      if: github.event.inputs.create_load_balancer == 'true'
+      run: |
+        # Create target group
+        TG_ARN=$(aws elbv2 create-target-group \
+          --name TrepidusTargetGroup \
+          --protocol HTTP \
+          --port 5000 \
+          --vpc-id ${{ env.VPC_ID }} \
+          --target-type ip \
+          --health-check-path /health \
+          --health-check-interval-seconds 30 \
+          --health-check-timeout-seconds 5 \
+          --healthy-threshold-count 2 \
+          --unhealthy-threshold-count 3 \
+          --query 'TargetGroups[0].TargetGroupArn' \
+          --output text \
+          --region ${{ github.event.inputs.aws_region }})
+          
+        # Create load balancer
+        LB_ARN=$(aws elbv2 create-load-balancer \
+          --name TrepidusLoadBalancer \
+          --subnets ${{ env.SUBNET1_ID }} ${{ env.SUBNET2_ID }} \
+          --security-groups ${{ env.SECURITY_GROUP_ID }} \
+          --query 'LoadBalancers[0].LoadBalancerArn' \
+          --output text \
+          --region ${{ github.event.inputs.aws_region }})
+          
+        # Create listener
+        aws elbv2 create-listener \
+          --load-balancer-arn $LB_ARN \
+          --protocol HTTP \
+          --port 80 \
+          --default-actions Type=forward,TargetGroupArn=$TG_ARN \
+          --region ${{ github.event.inputs.aws_region }}
+          
+        echo "TARGET_GROUP_ARN=$TG_ARN" >> $GITHUB_ENV
+        echo "LOAD_BALANCER_ARN=$LB_ARN" >> $GITHUB_ENV
+        
+        # Get load balancer DNS name
+        LB_DNS=$(aws elbv2 describe-load-balancers \
+          --load-balancer-arns $LB_ARN \
+          --query 'LoadBalancers[0].DNSName' \
+          --output text \
+          --region ${{ github.event.inputs.aws_region }})
+          
+        echo "Load Balancer created successfully. You can access your website at: http://$LB_DNS"
+        
+    - name: Create Task Definition
+      run: |
+        # Update task definition file with region and account ID
+        ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text)
+        cat aws-ecs-task-definition.json | sed "s/<your-account-id>/$ACCOUNT_ID/g" | sed "s/<your-region>/${{ github.event.inputs.aws_region }}/g" > updated-task-def.json
+        
+        # Register task definition
+        aws ecs register-task-definition \
+          --cli-input-json file://updated-task-def.json \
+          --region ${{ github.event.inputs.aws_region }}
+          
+    - name: Create ECS Service
+      if: github.event.inputs.create_load_balancer == 'true'
+      run: |
+        # Create the service with load balancer
+        aws ecs create-service \
+          --cluster ${{ github.event.inputs.cluster_name }} \
+          --service-name ${{ github.event.inputs.service_name }} \
+          --task-definition trepidus-tech-website \
+          --desired-count 1 \
+          --launch-type FARGATE \
+          --network-configuration "awsvpcConfiguration={subnets=[${{ env.SUBNET1_ID }},${{ env.SUBNET2_ID }}],securityGroups=[${{ env.SECURITY_GROUP_ID }}],assignPublicIp=ENABLED}" \
+          --load-balancers "targetGroupArn=${{ env.TARGET_GROUP_ARN }},containerName=trepidus-tech-website,containerPort=5000" \
+          --region ${{ github.event.inputs.aws_region }}
+          
+    - name: Create ECS Service (No Load Balancer)
+      if: github.event.inputs.create_load_balancer != 'true'
+      run: |
+        # Get subnets and security groups from default VPC
+        DEFAULT_VPC_ID=$(aws ec2 describe-vpcs --filters Name=isDefault,Values=true --query 'Vpcs[0].VpcId' --output text --region ${{ github.event.inputs.aws_region }})
+        SUBNETS=$(aws ec2 describe-subnets --filters Name=vpc-id,Values=$DEFAULT_VPC_ID --query 'Subnets[0:2].SubnetId' --output text --region ${{ github.event.inputs.aws_region }})
+        SUBNET_IDS=($SUBNETS)
+        
+        # Create security group for the ECS tasks
+        SG_ID=$(aws ec2 create-security-group \
+          --group-name TrepidusECSSecurityGroup \
+          --description "Security group for Trepidus Tech Website ECS tasks" \
+          --vpc-id $DEFAULT_VPC_ID \
+          --query 'GroupId' \
+          --output text \
+          --region ${{ github.event.inputs.aws_region }})
+          
+        # Allow inbound traffic on port 5000
+        aws ec2 authorize-security-group-ingress \
+          --group-id $SG_ID \
+          --protocol tcp \
+          --port 5000 \
+          --cidr 0.0.0.0/0 \
+          --region ${{ github.event.inputs.aws_region }}
+        
+        # Create the service without load balancer
+        aws ecs create-service \
+          --cluster ${{ github.event.inputs.cluster_name }} \
+          --service-name ${{ github.event.inputs.service_name }} \
+          --task-definition trepidus-tech-website \
+          --desired-count 1 \
+          --launch-type FARGATE \
+          --network-configuration "awsvpcConfiguration={subnets=[${SUBNET_IDS[0]},${SUBNET_IDS[1]}],securityGroups=[$SG_ID],assignPublicIp=ENABLED}" \
+          --region ${{ github.event.inputs.aws_region }}
+          
+    - name: Print Summary
+      run: |
+        echo "AWS infrastructure setup complete!"
+        echo ""
+        echo "Summary:"
+        echo "- ECR Repository: ${{ env.ECR_REPOSITORY }}"
+        echo "- ECS Cluster: ${{ github.event.inputs.cluster_name }}"
+        echo "- ECS Service: ${{ github.event.inputs.service_name }}"
+        
+        if [ "${{ github.event.inputs.create_load_balancer }}" == "true" ]; then
+          LB_DNS=$(aws elbv2 describe-load-balancers \
+            --load-balancer-arns ${{ env.LOAD_BALANCER_ARN }} \
+            --query 'LoadBalancers[0].DNSName' \
+            --output text \
+            --region ${{ github.event.inputs.aws_region }})
+            
+          echo "- Load Balancer URL: http://$LB_DNS"
+        fi
+        
+        echo ""
+        echo "Next steps:"
+        echo "1. Update the SendGrid API key in AWS Systems Manager Parameter Store"
+        echo "2. Push code to your repository to trigger the deployment workflow"
