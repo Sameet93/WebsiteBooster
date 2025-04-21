@@ -12,6 +12,11 @@ const contactSchema = z.object({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint for AWS ECS
+  app.get("/health", (req, res) => {
+    res.status(200).json({ status: "healthy" });
+  });
+
   // Contact form endpoint
   app.post("/api/contact", async (req, res) => {
     try {
