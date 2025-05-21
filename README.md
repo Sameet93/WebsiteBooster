@@ -47,78 +47,78 @@ This is the official website for Trepidus Tech, featuring their IT consulting se
 
 ## Deployment
 
-### CI/CD with GitHub Actions
+### AWS Elastic Beanstalk Deployment
 
-This project includes several GitHub Actions workflows for automated testing and deployment:
+This project is configured for easy deployment to AWS Elastic Beanstalk:
+
+1. **Quick Deployment with Script**
+   ```bash
+   ./deploy-to-eb.sh [region] [environment] [sendgrid-api-key]
+   ```
+   
+   Example:
+   ```bash
+   ./deploy-to-eb.sh us-east-1 production your-sendgrid-api-key
+   ```
+
+2. **Manual Deployment with EB CLI**
+   ```bash
+   # Install EB CLI if you haven't already
+   pip install awsebcli
+   
+   # Initialize EB (first time only)
+   eb init --region us-east-1 --platform "Node.js 20" trepidus-tech
+   
+   # Create environment (first time only)
+   eb create production
+   
+   # Set environment variables
+   eb setenv NODE_ENV=production SENDGRID_API_KEY=your-sendgrid-api-key
+   
+   # Deploy your application
+   eb deploy
+   
+   # Open your application in a browser
+   eb open
+   ```
+
+### EB Configuration Details
+
+The repository includes several important configuration files for Elastic Beanstalk:
+
+- `.elasticbeanstalk/config.yml`: Core EB configuration
+- `.ebextensions/*.config`: Server configuration and environment settings
+- `Procfile`: Defines how to start the application
+
+### Using GitHub Actions with Elastic Beanstalk
+
+If you prefer automated deployments, you can use GitHub Actions with Elastic Beanstalk:
 
 1. **Test Workflow** (`.github/workflows/test.yml`)
-   - Runs on all pull requests and branch pushes (except main)
-   - Performs linting, type checking, and API tests
-   - Builds and tests Docker image
+   - Runs tests for all pull requests and branch pushes
 
-2. **AWS Deployment Workflow** (`.github/workflows/aws-deploy.yml`)
-   - Runs on pushes to main branch and manual triggers
-   - Performs testing, builds Docker image
-   - Deploys to AWS ECS
-   - Performs post-deployment verification
+2. You can add your own EB deployment workflow using the AWS Elastic Beanstalk GitHub Action
 
-3. **AWS Infrastructure Setup** (`.github/workflows/aws-setup.yml`)
-   - Sets up required AWS infrastructure (one-time setup)
-   - Creates ECR repository, ECS cluster, and load balancer
-   - Can be triggered manually with custom parameters
+### Required AWS Permissions
 
-4. **Environment Creation** (`.github/workflows/create-environment.yml`)
-   - Creates additional environments (staging, dev, etc.)
-   - Sets up necessary AWS resources
-   - Generates deployment workflow for the environment
+To deploy to Elastic Beanstalk, ensure your AWS user has:
 
-### Required GitHub Secrets
+- `AWSElasticBeanstalkFullAccess` permissions
+- Appropriate IAM, S3, and EC2 permissions
 
-To use the CI/CD workflows, add these secrets to your GitHub repository:
+### Alternative Deployment Options
 
-- `AWS_ACCESS_KEY_ID`: Your AWS access key
-- `AWS_SECRET_ACCESS_KEY`: Your AWS secret key
+The project also includes Docker configuration for containerized deployment:
 
-### Manual Deployment with Docker
-
-1. Build the Docker image:
-   ```
-   docker build -t trepidus-tech-website .
-   ```
-
-2. Test locally with Docker Compose:
-   ```
-   docker-compose up
-   ```
-
-3. Push to Amazon ECR (Elastic Container Registry):
-   ```
-   # Login to ECR
-   aws ecr get-login-password --region <your-region> | docker login --username AWS --password-stdin <your-account-id>.dkr.ecr.<your-region>.amazonaws.com
-
-   # Create a repository if you haven't already
-   aws ecr create-repository --repository-name trepidus-tech-website --region <your-region>
-
-   # Tag the image
-   docker tag trepidus-tech-website:latest <your-account-id>.dkr.ecr.<your-region>.amazonaws.com/trepidus-tech-website:latest
-
-   # Push the image
-   docker push <your-account-id>.dkr.ecr.<your-region>.amazonaws.com/trepidus-tech-website:latest
-   ```
-
-### Using the Deployment Script
-
-A helper script is included to simplify deployment:
-
-```
-./deploy-to-aws.sh <aws-region> <aws-account-id>
+```bash
+# Build and run locally with Docker
+docker build -t trepidus-tech-website .
+docker run -p 5000:5000 trepidus-tech-website
 ```
 
-This script handles building, tagging, and pushing the Docker image, and updating the ECS task definition.
+### Advanced Deployment Documentation
 
-### Advanced Deployment Options
-
-For more advanced deployment options and detailed instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
+For more detailed instructions on EB deployment, see [EB_DEPLOYMENT.md](./EB_DEPLOYMENT.md).
 
 ## Environment Variables
 
