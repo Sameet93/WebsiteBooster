@@ -1,13 +1,14 @@
 import { Card } from "@/components/ui/card";
 import ScrollAnimation from "./ScrollAnimation";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
+import sameetImage from "../assets/sameet-new.jpeg";
 
 export default function Team() {
   const teamMembers = [
     {
       name: "Sameet",
       role: "Co-founder & CTO",
-      imgUrl: "/images/sameet-new.jpeg"
+      imgUrl: sameetImage
     },
     {
       name: "Dharnesh",
