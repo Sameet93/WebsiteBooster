@@ -7,7 +7,7 @@ export default function Team() {
     {
       name: "Sameet",
       role: "Co-founder & CTO",
-      imgUrl: "https://mlrdxjezzfez.i.optimole.com/w:201/h:268/q:mauto/ig:avif/http://trepidustech.com/wp-content/uploads/2024/11/IMG_2631-scaled.jpeg"
+      imgUrl: "/images/sameet-new.jpeg"
     },
     {
       name: "Dharnesh",
