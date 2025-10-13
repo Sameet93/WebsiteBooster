@@ -1,0 +1,22 @@
+# AWS Configuration
+aws_region  = "us-east-1"
+environment = "production"
+
+# Application Configuration
+app_name    = "trepidus-tech"
+domain_name = "trepidustech.com"
+
+# Create www subdomain redirect
+create_www_redirect = true
+
+# Instance Configuration
+instance_type = "t3.small"
+min_instances = 1
+max_instances = 4
+
+# VPC Configuration (optional - leave empty to use default VPC)
+vpc_id = ""
+
+# SendGrid API Key (REQUIRED - get from SendGrid dashboard)
+# This will be stored in terraform.tfvars (not committed to git)
+sendgrid_api_key = "YOUR_SENDGRID_API_KEY_HERE"
