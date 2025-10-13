@@ -2,7 +2,21 @@
 
 ## Overview
 
-This is a corporate website for Trepidus Tech, an IT consulting company. The application is a full-stack web application built with React (TypeScript) on the frontend and Express.js on the backend. It features a modern, responsive design showcasing the company's services, team members, and client testimonials, with a functional contact form that sends emails via SendGrid.
+This is a corporate website for Trepidus Tech, an IT consulting company. The application is a full-stack web application built with React (TypeScript) on the frontend and Express.js on the backend. It features a modern, responsive design showcasing the company's services, in-house products (CloudCostGuardian), team members, and client testimonials, with a functional contact form that sends emails via SendGrid.
+
+## Recent Changes (October 2025)
+
+**CloudCostGuardian Product Integration**
+- Added dedicated Products section showcasing CloudCostGuardian (cloudcostguardian.com)
+- CloudCostGuardian: AI-powered FinOps platform for cloud cost management
+- Features multi-cloud support (AWS, GCP, Azure), real-time anomaly detection, and instant alerts
+- Includes security highlights, integrations showcase, and promotional CTA (6 months free offer)
+
+**In-House Apps Section**
+- New section highlighting Trepidus's custom application development capabilities
+- Showcases technical expertise in building production-ready applications
+- Emphasizes rapid development, enterprise-grade security, and customer-focused approach
+- Updated navigation to include Products and In-House Apps links
 
 ## User Preferences
 
@@ -31,7 +45,12 @@ Preferred communication style: Simple, everyday language.
 
 **Component Architecture**
 - Page-level components in `client/src/pages/` (Home, NotFound)
-- Reusable UI components in `client/src/components/` (Header, Hero, About, Services, Team, Testimonials, Contact, Footer)
+- Reusable UI components in `client/src/components/`:
+  - Header (with updated navigation including Products and In-House Apps)
+  - Hero, About, Services
+  - **Products** (CloudCostGuardian showcase with features, security, integrations, and CTA)
+  - **InHouseApps** (custom development capabilities and technical expertise)
+  - Team, Testimonials, Contact, Footer
 - Scroll animations using Intersection Observer API for progressive content reveal
 - Form validation using Zod schemas with error handling
 
