@@ -225,15 +225,15 @@ resource "aws_elastic_beanstalk_environment" "trepidus_tech_env" {
   }
 }
 
-# Route53 Record
+# Route53 Record - Apex domain
 resource "aws_route53_record" "main" {
   zone_id = data.aws_route53_zone.main.zone_id
   name    = var.domain_name
   type    = "A"
 
   alias {
-    name                   = aws_elastic_beanstalk_environment.trepidus_tech_env.endpoint_url
-    zone_id                = aws_elastic_beanstalk_environment.trepidus_tech_env.load_balancers[0]
+    name                   = aws_elastic_beanstalk_environment.trepidus_tech_env.cname
+    zone_id                = data.aws_elastic_beanstalk_hosted_zone.current.id
     evaluate_target_health = true
   }
 }
@@ -246,8 +246,13 @@ resource "aws_route53_record" "www" {
   type    = "A"
 
   alias {
-    name                   = aws_elastic_beanstalk_environment.trepidus_tech_env.endpoint_url
-    zone_id                = aws_elastic_beanstalk_environment.trepidus_tech_env.load_balancers[0]
+    name                   = aws_elastic_beanstalk_environment.trepidus_tech_env.cname
+    zone_id                = data.aws_elastic_beanstalk_hosted_zone.current.id
     evaluate_target_health = true
   }
+}
+
+# Data source for Elastic Beanstalk hosted zone ID
+data "aws_elastic_beanstalk_hosted_zone" "current" {
+  region = var.aws_region
 }

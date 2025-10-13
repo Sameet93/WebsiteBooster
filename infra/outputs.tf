@@ -23,9 +23,9 @@ output "route53_nameservers" {
   value       = data.aws_route53_zone.main.name_servers
 }
 
-output "load_balancer_zone_id" {
-  description = "Load balancer zone ID"
-  value       = aws_elastic_beanstalk_environment.trepidus_tech_env.load_balancers[0]
+output "elastic_beanstalk_hosted_zone_id" {
+  description = "Elastic Beanstalk hosted zone ID for the region"
+  value       = data.aws_elastic_beanstalk_hosted_zone.current.id
 }
 
 output "acm_certificate_arn" {

@@ -44,20 +44,10 @@ resource "aws_iam_role" "ec2_role" {
   })
 }
 
-# Attach AWS managed policies
+# Attach AWS managed policy for Web Tier (Node.js app)
 resource "aws_iam_role_policy_attachment" "ec2_web_tier" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/AWSElasticBeanstalkWebTier"
-}
-
-resource "aws_iam_role_policy_attachment" "ec2_worker_tier" {
-  role       = aws_iam_role.ec2_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSElasticBeanstalkWorkerTier"
-}
-
-resource "aws_iam_role_policy_attachment" "ec2_multicontainer_docker" {
-  role       = aws_iam_role.ec2_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSElasticBeanstalkMulticontainerDocker"
 }
 
 # Custom policy for CloudWatch Logs
