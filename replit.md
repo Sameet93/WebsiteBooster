@@ -18,6 +18,14 @@ This is a corporate website for Trepidus Tech, an IT consulting company. The app
 - Emphasizes rapid development, enterprise-grade security, and customer-focused approach
 - Updated navigation to include Products and In-House Apps links
 
+**Infrastructure as Code (Terraform)**
+- Complete Terraform configuration for AWS Elastic Beanstalk deployment
+- Automated Route53 DNS configuration with SSL/TLS (ACM certificate)
+- IAM roles and policies following least privilege principles
+- Auto-scaling configuration (1-4 t3.small instances)
+- Application Load Balancer with HTTPS enforcement
+- Comprehensive deployment documentation in `infra/` directory
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -93,20 +101,61 @@ Preferred communication style: Simple, everyday language.
 
 ### Build & Deployment
 
-**Containerization**
-- Docker support with multi-stage builds
-- Health check endpoint for container orchestration
-- AWS ECS task definition included for cloud deployment
-
 **Build Process**
 - Frontend: Vite build outputs to `dist/public`
 - Backend: esbuild bundles server code to `dist/index.js`
 - Separate commands for development, build, and production modes
 
+**Infrastructure as Code (Terraform)**
+- Complete Terraform modules in `infra/` directory
+- Resources managed: Elastic Beanstalk, Route53, IAM, ALB
+- Configuration files:
+  - `main.tf`: Core infrastructure (EB environment, Route53 records, ALB configuration)
+  - `iam.tf`: IAM roles and policies for EC2 and EB service
+  - `variables.tf`: Input variables (region, domain, instance type, etc.)
+  - `outputs.tf`: Output values (URLs, zone IDs, certificate ARN)
+  - `terraform.tfvars.example`: Template for environment-specific configuration
+
+**Elastic Beanstalk Configuration**
+- Platform: 64bit Amazon Linux 2023 / Node.js 20
+- Instance type: t3.small (configurable)
+- Auto-scaling: 1-4 instances (configurable)
+- Load balancer: Application Load Balancer with HTTPS
+- Health check: `/health` endpoint
+- Managed platform updates: Enabled (Sundays 10:00 UTC)
+- Rolling updates: Health-based deployment strategy
+- Configuration files in `.ebextensions/`:
+  - `01_nodecommand.config`: Node.js runtime configuration
+  - `02_environment.config`: Environment variables
+  - `03_nginx.config`: Nginx optimization (gzip, caching)
+  - `04_healthcheck.config`: Health check settings
+
+**Route53 & SSL/TLS**
+- DNS management via Route53
+- A record alias to Elastic Beanstalk ALB
+- ACM certificate for trepidustech.com (HTTPS enforcement)
+- Optional www subdomain redirect
+- Automatic DNS configuration through Terraform
+
 **CI/CD Infrastructure**
-- GitHub Actions workflows configured (references in documentation)
-- AWS deployment options: Elastic Beanstalk and ECS/Fargate
-- Environment secrets management via AWS Parameter Store
+- GitHub Actions workflows for automated deployment
+- AWS deployment: Elastic Beanstalk (primary), ECS/Fargate (alternative)
+- Environment secrets management via Terraform variables
+- Deployment documentation in `infra/README.md`
+
+**Deployment Methods**
+1. **Terraform + EB CLI** (Recommended):
+   - `terraform apply` to provision infrastructure
+   - `npm run build` to build application
+   - `eb deploy` to deploy application code
+
+2. **GitHub Actions** (Automated):
+   - Push to main branch triggers deployment
+   - Automated build, test, and deploy pipeline
+
+3. **Manual ECS** (Alternative):
+   - Docker containerization support
+   - ECS task definitions available
 
 ### Development Tools
 
@@ -145,9 +194,11 @@ Preferred communication style: Simple, everyday language.
 - Fargate launch type for serverless container execution
 - Task definition includes health checks and logging
 
-**AWS Elastic Beanstalk** (alternative deployment)
-- Platform-as-a-Service option for simplified deployment
+**AWS Elastic Beanstalk** (primary deployment)
+- Platform-as-a-Service for simplified deployment
+- Fully automated via Terraform in `infra/` directory
 - Deployment scripts provided (`deploy-to-eb.sh`)
+- Comprehensive setup guide in `infra/README.md`
 
 **AWS Systems Manager Parameter Store**
 - Secure storage for sensitive configuration (e.g., SendGrid API key)
