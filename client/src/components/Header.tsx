@@ -51,13 +51,14 @@ export default function Header() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex space-x-8">
-          {["about", "services", "team", "testimonials", "contact"].map((item) => (
+          {["about", "services", "products", "in-house-apps", "team", "testimonials", "contact"].map((item) => (
             <button
               key={item}
               onClick={() => scrollToSection(item)}
               className="text-muted-foreground hover:text-foreground transition-colors capitalize"
+              data-testid={`nav-${item}`}
             >
-              {item}
+              {item === "in-house-apps" ? "In-House Apps" : item}
             </button>
           ))}
         </nav>
@@ -84,13 +85,14 @@ export default function Header() {
       >
         <div className="container mx-auto px-4 py-3">
           <nav className="flex flex-col space-y-3">
-            {["about", "services", "team", "testimonials", "contact"].map((item) => (
+            {["about", "services", "products", "in-house-apps", "team", "testimonials", "contact"].map((item) => (
               <button
                 key={item}
                 onClick={() => scrollToSection(item)}
                 className="text-muted-foreground hover:text-foreground py-2 transition-colors text-left capitalize"
+                data-testid={`nav-mobile-${item}`}
               >
-                {item}
+                {item === "in-house-apps" ? "In-House Apps" : item}
               </button>
             ))}
           </nav>
