@@ -1,22 +1,20 @@
-# AWS Configuration
-aws_region  = "us-east-1"
+# Example terraform.tfvars for infra
+# Copy to terraform.tfvars and fill values before running `terraform apply`
+
+aws_region = "eu-west-1"
+app_name = "websitebooster"
 environment = "production"
-
-# Application Configuration
-app_name    = "trepidus-tech"
-domain_name = "trepidustech.com"
-
-# Create www subdomain redirect
+domain_name = "example.com"
+hosted_zone_id = "ZXXXXXXXXXXXXX"
 create_www_redirect = true
-
-# Instance Configuration
 instance_type = "t3.small"
 min_instances = 1
-max_instances = 4
-
-# VPC Configuration (optional - leave empty to use default VPC)
+max_instances = 2
 vpc_id = ""
+certificate_request = true
+sendgrid_api_key = ""
 
-# SendGrid API Key (REQUIRED - get from SendGrid dashboard)
-# This will be stored in terraform.tfvars (not committed to git)
-sendgrid_api_key = "YOUR_SENDGRID_API_KEY_HERE"
+# Optional tags
+# tags = {
+#   Owner = "you@example.com"
+# }

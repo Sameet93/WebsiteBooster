@@ -1,0 +1,55 @@
+{
+  "acm_certificate_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:acm:eu-west-1:590183842459:certificate/95135eef-92da-44c9-b5d2-d576ac1b66c0"
+  },
+  "domain_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "https://trepidustech.com"
+  },
+  "eb_s3_bucket": {
+    "sensitive": false,
+    "type": "string",
+    "value": "trepidustech-production-eb-app-versions-590183842459"
+  },
+  "ecr_repository_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "590183842459.dkr.ecr.eu-west-1.amazonaws.com/trepidustech-production"
+  },
+  "elastic_beanstalk_cname": {
+    "sensitive": false,
+    "type": "string",
+    "value": "trepidustech-production.eba-mhpcxmxa.eu-west-1.elasticbeanstalk.com"
+  },
+  "elastic_beanstalk_environment_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "trepidustech-production"
+  },
+  "elastic_beanstalk_environment_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "awseb--AWSEB-7zov9GIOcJYm-185407650.eu-west-1.elb.amazonaws.com"
+  },
+  "elastic_beanstalk_hosted_zone_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "Z2NYPWQ7DFZAZH"
+  },
+  "route53_nameservers": {
+    "sensitive": false,
+    "type": [
+      "list",
+      "string"
+    ],
+    "value": [
+      "ns-510.awsdns-63.com",
+      "ns-1558.awsdns-02.co.uk",
+      "ns-1208.awsdns-23.org",
+      "ns-903.awsdns-48.net"
+    ]
+  }
+}

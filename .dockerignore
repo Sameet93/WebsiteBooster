@@ -14,3 +14,8 @@ README.md
 docker-compose.yml
 Dockerfile
 .dockerignore
+infra/
+.terraform/
+*.tfstate
+*.tfstate.backup
+infra/deploy.sh

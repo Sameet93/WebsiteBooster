@@ -1,16 +1,16 @@
 output "elastic_beanstalk_environment_name" {
   description = "Name of the Elastic Beanstalk environment"
-  value       = aws_elastic_beanstalk_environment.trepidus_tech_env.name
+  value       = aws_elastic_beanstalk_environment.env.name
 }
 
 output "elastic_beanstalk_environment_url" {
   description = "URL of the Elastic Beanstalk environment"
-  value       = aws_elastic_beanstalk_environment.trepidus_tech_env.endpoint_url
+  value       = aws_elastic_beanstalk_environment.env.endpoint_url
 }
 
 output "elastic_beanstalk_cname" {
   description = "CNAME of the Elastic Beanstalk environment"
-  value       = aws_elastic_beanstalk_environment.trepidus_tech_env.cname
+  value       = aws_elastic_beanstalk_environment.env.cname
 }
 
 output "domain_url" {
@@ -20,7 +20,7 @@ output "domain_url" {
 
 output "route53_nameservers" {
   description = "Route53 hosted zone nameservers"
-  value       = data.aws_route53_zone.main.name_servers
+  value       = var.hosted_zone_id != "" ? data.aws_route53_zone.by_id[0].name_servers : data.aws_route53_zone.by_name[0].name_servers
 }
 
 output "elastic_beanstalk_hosted_zone_id" {
@@ -28,7 +28,17 @@ output "elastic_beanstalk_hosted_zone_id" {
   value       = data.aws_elastic_beanstalk_hosted_zone.current.id
 }
 
+output "ecr_repository_url" {
+  description = "ECR repository URL"
+  value       = aws_ecr_repository.app.repository_url
+}
+
+output "eb_s3_bucket" {
+  description = "S3 bucket used to store EB application versions"
+  value       = aws_s3_bucket.eb_app_versions.bucket
+}
+
 output "acm_certificate_arn" {
-  description = "ACM certificate ARN"
-  value       = data.aws_acm_certificate.main.arn
+  description = "ACM certificate ARN (if created or used)"
+  value       = local.certificate_arn
 }
