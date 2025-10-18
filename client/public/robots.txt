@@ -1,0 +1,16 @@
+User-agent: *
+Allow: /
+
+# Crawl-delay can be adjusted if required by your hosting provider
+# Crawl-delay: 10
+
+# Disallow common non-public paths
+Disallow: /admin
+Disallow: /wp-admin
+Disallow: /private
+Disallow: /.git
+Disallow: /node_modules
+Disallow: /infra
+
+# Link to sitemap
+Sitemap: https://trepidustech.com/sitemap.xml
